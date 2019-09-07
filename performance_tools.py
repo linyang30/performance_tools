@@ -80,6 +80,32 @@ def get_cpu_freg(cpu_core_number):
     print(cpuFreqList[::-1])
     return cpuFreqList[::-1]
 
+def get_phone_fps():
+    command = 'adb shell dumpsys gfxinfo'
+    p = subprocess.Popen(command, shell=True, stdout=subprocess.PIPE)
+    out = p.stdout.readlines()
+    for data in out:
+        if data.decode('utf-8').startswith('Total frames rendered:'):
+            out_m = data.decode('utf-8')
+        if data.decode('utf-8').startswith('HISTOGRAM:'):
+            out_render_time = data.decode('utf-8')
+    render_time_list = []
+    extra_jank = 0
+    out_render_time = out_render_time.split()[1:]
+    for i in out_render_time:
+        render_time, times = re.findall(r'(\d+)ms=(\d+)', i)[0]
+        if int(times) != 0:
+            render_time_list.append((int(render_time), int(times)))
+    for j in render_time_list:
+        if j[0] > 16.67:
+            for i in range(j[1]):
+                extra_jank += round(j[0] / 16.67)
+
+    m = int(re.findall(r'Total frames rendered: (\d+)', out_m)[0])
+    fps = round((m * 60 / (m + extra_jank)))
+    print('fps:', fps)
+    return fps
+
 
 
 def main():
@@ -88,7 +114,7 @@ def main():
         cpu_core_num = 8
         i = 0
         j = 0
-        row = ['时间', '系统CPU占用', '系统内存占用']
+        row = ['时间', '系统CPU占用', '系统内存占用', 'fps']
         while(j < cpu_core_num):
             row.append('cpu' + str(j))
             j = j + 1
@@ -97,8 +123,9 @@ def main():
             cpu_info = get_phone_cpu_info3()
             mem_info = get_phone_memory_info()
             cpu_freq = get_cpu_freg(cpu_core_num)
+            fps = get_phone_fps()
             ct = get_current_time()
-            writer.writerow([ct, cpu_info, mem_info] + cpu_freq)
+            writer.writerow([ct, cpu_info, mem_info, fps] + cpu_freq)
             time.sleep(5)
             i = i + 5
 
